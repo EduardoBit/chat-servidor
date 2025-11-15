@@ -44,7 +44,7 @@ const io = new Server(servidor, {
 });
 
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 // Configuración de la Base de Datos 
 const pool = mysql.createPool({
   host: 'localhost',
