@@ -282,31 +282,48 @@ io.on('connection', (socket) => {
   });
 
   socket.on('solicitarHistorial', async (salaId: number, callback) => {
-    try {
-      const [filas]: any[] = await pool.execute(
-        `SELECT m.contenido, m.fecha_creacion, u.username 
-         FROM mensajes m
-         JOIN usuarios u ON m.usuario_id = u.id
-         WHERE m.sala_id = ?
-         ORDER BY m.fecha_creacion ASC
-         LIMIT 50`,
-        [salaId]
-      );
+  try {
+    const { id: usuarioId } = (socket as any).usuario;
 
-      // Mapeamos los nombres de columna de la DB a nuestro Payload
-      const historial = filas.map((fila : any) => ({
+    // 1. Buscamos la fecha en que este usuario se unió a ESTA sala
+    const [filasMiembro]: any[] = await pool.execute(
+      'SELECT fecha_union FROM sala_miembros WHERE usuario_id = ? AND sala_id = ?',
+      [usuarioId, salaId]
+    );
+
+    if (filasMiembro.length === 0) {
+      // Esto no debería pasar si 'unirseASala' funcionó, pero es un resguardo.
+      return callback([]); 
+    }
+
+    const fechaUnion = filasMiembro[0].fecha_union;
+
+    // 2. Ahora, pedimos solo los mensajes CREADOS DESPUÉS (o al mismo tiempo) que el usuario se unió
+    const [filas]: any[] = await pool.execute(
+      `SELECT m.contenido, m.imagen_url, m.fecha_creacion, u.username 
+       FROM mensajes m
+       JOIN usuarios u ON m.usuario_id = u.id
+       WHERE m.sala_id = ? AND m.fecha_creacion >= ?  /* <-- ¡AQUÍ ESTÁ EL CAMBIO! */
+       ORDER BY m.fecha_creacion ASC
+       LIMIT 100`, // (Aumenté el límite por si acaso)
+      [salaId, fechaUnion]
+    );
+
+    // Mapeamos los nombres de columna de la DB a nuestro Payload
+    const historial = filas.map((fila : any) => ({
         usuario: fila.username,
         texto: fila.contenido,
+        imagen_url: fila.imagen_url, // (Aseguramos que carguen las imágenes)
         timestamp: fila.fecha_creacion
-      }));
-      
-      callback(historial); // Enviamos el historial de vuelta
+    }));
 
-    } catch (error) {
-      console.error("Error en solicitarHistorial:", error);
-      callback([]);
-    }
-  });
+    callback(historial); // Enviamos el historial (ahora filtrado)
+
+  } catch (error) {
+    console.error("Error en solicitarHistorial:", error);
+    callback([]);
+  }
+});
 
   socket.on('sendMessage', async (payload: { texto?: string, imagen_url?: string }) => {
   try {
