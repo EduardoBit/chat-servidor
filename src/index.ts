@@ -8,6 +8,12 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 dotenv.config();
 import { v2 as cloudinary } from 'cloudinary';
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'chat_db'
+});
 import multer from 'multer';
 
 // Configura Multer para guardar el archivo en memoria temporalmente
@@ -45,14 +51,6 @@ const io = new Server(servidor, {
 
 
 const PORT = process.env.PORT || 3000;
-// Configuración de la Base de Datos 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root', 
-  password: DB_PASSWORD || '',
-  database: 'chat_db'
-});
-
 
 // REGISTRAR un nuevo usuario
 app.post('/api/registrar', async (req, res) => {
